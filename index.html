@@ -1,0 +1,263 @@
+     <!DOCTYPE html>
+     <html lang="en">
+     <head>
+         <meta charset="UTF-8">
+         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+         <title>Super Media Downloader</title>
+         <script src="https://cdn.tailwindcss.com"></script>
+     </head>
+     <body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white min-h-screen flex flex-col items-center justify-center transition-colors duration-300">
+         <div class="flex justify-end w-full max-w-3xl p-4">
+             <button id="themeToggle" class="p-2 rounded-full bg-gray-200 dark:bg-gray-700">
+                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path id="sun" class="block dark:hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                     <path id="moon" class="hidden dark:block" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                 </svg>
+             </button>
+         </div>
+         <div id="media-downloader" class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg w-full max-w-3xl">
+             <h1 class="text-3xl font-bold mb-6 text-center">Super Media Downloader</h1>
+             <textarea
+                 id="mediaUrls"
+                 placeholder="Enter media URLs (one per line, supports YouTube Videos/Shorts, Facebook Videos/Reels, Instagram Videos/Reels, Vimeo, TikTok, SoundCloud, Dailymotion, DRM-protected)"
+                 class="w-full p-3 mb-4 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white resize-y"
+                 rows="4"
+             ></textarea>
+             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                 <select id="format" class="w-full p-3 border rounded dark:bg-gray-700 dark:border-gray-600">
+                     <option value="mp3">MP3 (Audio)</option>
+                     <option value="mp4">MP4 (Video)</option>
+                     <option value="aac">AAC (Audio)</option>
+                     <option value="m4a">M4A (Audio)</option>
+                     <option value="webm">WEBM (Video)</option>
+                 </select>
+                 <select id="quality" class="w-full p-3 border rounded dark:bg-gray-700 dark:border-gray-600">
+                     <option value="default">Default Quality</option>
+                     <option value="low">Low (64kbps / 360p)</option>
+                     <option value="medium">Medium (128kbps / 720p)</option>
+                     <option value="high">High (320kbps / 1080p)</option>
+                     <option value="4k">4K (2160p)</option>
+                     <option value="8k">8K (4320p)</option>
+                     <option value="16k" disabled title="16K not available yet">16K (Future)</option>
+                 </select>
+                 <select id="platform" class="w-full p-3 border rounded dark:bg-gray-700 dark:border-gray-600">
+                     <option value="auto">Auto-Detect</option>
+                     <option value="youtube">YouTube (Videos/Shorts)</option>
+                     <option value="facebook">Facebook (Videos/Reels)</option>
+                     <option value="instagram">Instagram (Videos/Reels)</option>
+                     <option value="vimeo">Vimeo</option>
+                     <option value="tiktok">TikTok</option>
+                     <option value="soundcloud">SoundCloud</option>
+                     <option value="dailymotion">Dailymotion</option>
+                 </select>
+             </div>
+             <div class="mb-4">
+                 <label class="flex items-center">
+                     <input type="checkbox" id="trim" class="mr-2">
+                     <span>Trim media (specify start/end time)</span>
+                 </label>
+                 <div id="trimOptions" class="hidden mt-2 grid grid-cols-2 gap-4">
+                     <input type="text" id="startTime" placeholder="Start (e.g., 00:30)" class="p-2 border rounded dark:bg-gray-700 dark:border-gray-600">
+                     <input type="text" id="endTime" placeholder="End (e.g., 01:00)" class="p-2 border rounded dark:bg-gray-700 dark:border-gray-600">
+                 </div>
+             </div>
+             <div class="mb-4">
+                 <label class="block mb-2">Cookies File (for DRM-protected or private content, e.g., YouTube Premium, private Facebook/Instagram):</label>
+                 <input type="file" id="cookiesFile" accept=".txt" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600">
+                 <p class="text-sm text-gray-600 dark:text-gray-400">Export cookies from browser (e.g., cookies.txt extension)</p>
+             </div>
+             <button
+                 onclick="fetchMediaInfo()"
+                 class="w-full bg-blue-500 text-white p-3 rounded hover:bg-blue-600 mb-4"
+             >
+                 Analyze URLs
+             </button>
+             <div id="preview" class="hidden mb-4"></div>
+             <div id="loader" class="hidden animate-spin h-6 w-6 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+             <div id="progress" class="hidden w-full bg-gray-200 rounded-full h-4 mb-4 dark:bg-gray-700">
+                 <div id="progressBar" class="bg-blue-500 h-4 rounded-full" style="width: 0%"></div>
+             </div>
+             <p id="status" class="text-center"></p>
+         </div>
+
+         <script>
+             // Prevent duplicate forms
+             const existingForms = document.querySelectorAll('#media-downloader');
+             if (existingForms.length > 1) {
+                 existingForms.forEach((form, index) => {
+                     if (index > 0) form.remove();
+                 });
+                 alert('Duplicate forms detected and removed!');
+             }
+
+             // Dark mode toggle
+             const themeToggle = document.getElementById('themeToggle');
+             themeToggle.addEventListener('click', () => {
+                 document.body.classList.toggle('dark');
+                 localStorage.setItem('theme', document.body.classList.contains('dark') ? 'dark' : 'light');
+             });
+             if (localStorage.getItem('theme') === 'dark') {
+                 document.body.classList.add('dark');
+             }
+
+             // Trim options toggle
+             const trimCheckbox = document.getElementById('trim');
+             const trimOptions = document.getElementById('trimOptions');
+             trimCheckbox.addEventListener('change', () => {
+                 trimOptions.classList.toggle('hidden', !trimCheckbox.checked);
+             });
+
+             // Validate URL
+             function isValidUrl(string) {
+                 try {
+                     new URL(string);
+                     return true;
+                 } catch (_) {
+                     return false;
+                 }
+             }
+
+             // Fetch media info
+             async function fetchMediaInfo() {
+                 const urls = document.getElementById('mediaUrls').value.split('\n').filter(url => url.trim());
+                 const format = document.getElementById('format').value;
+                 const quality = document.getElementById('quality').value;
+                 const platform = document.getElementById('platform').value;
+                 const trim = document.getElementById('trim').checked;
+                 const startTime = document.getElementById('startTime').value;
+                 const endTime = document.getElementById('endTime').value;
+                 const cookiesFile = document.getElementById('cookiesFile').files[0];
+                 const status = document.getElementById('status');
+                 const loader = document.getElementById('loader');
+                 const preview = document.getElementById('preview');
+
+                 if (!urls.length || !urls.every(isValidUrl)) {
+                     status.textContent = 'Please enter valid URLs (one per line)';
+                     status.classList.add('text-red-500');
+                     return;
+                 }
+
+                 status.textContent = 'Analyzing...';
+                 status.classList.remove('text-red-500', 'text-green-500');
+                 loader.classList.remove('hidden');
+                 preview.classList.add('hidden');
+
+                 try {
+                     const formData = new FormData();
+                     formData.append('urls', JSON.stringify(urls));
+                     formData.append('platform', platform);
+                     if (cookiesFile) {
+                         formData.append('cookies', cookiesFile);
+                     }
+
+                     const response = await fetch('https://your-app.onrender.com/info', {
+                         method: 'POST',
+                         body: formData
+                     });
+
+                     loader.classList.add('hidden');
+
+                     if (response.ok) {
+                         const mediaInfo = await response.json();
+                         preview.innerHTML = mediaInfo.map(info => `
+                             <div class="border p-4 rounded mb-2 dark:border-gray-600">
+                                 <img src="${info.thumbnail}" alt="Thumbnail" class="w-32 h-18 object-cover rounded mb-2">
+                                 <p class="font-semibold">${info.title}</p>
+                                 <p class="text-sm text-gray-600 dark:text-gray-400">Duration: ${info.duration}</p>
+                                 <button
+                                     onclick="downloadMedia('${info.url}', '${format}', '${quality}', ${trim}, '${startTime}', '${endTime}')"
+                                     class="mt-2 bg-green-500 text-white p-2 rounded hover:bg-green-600"
+                                 >
+                                     Download
+                                 </button>
+                             </div>
+                         `).join('');
+                         preview.classList.remove('hidden');
+                         status.textContent = 'Select a media to download';
+                         status.classList.add('text-green-500');
+                     } else {
+                         const errorText = await response.text();
+                         status.textContent = `Error: ${errorText}`;
+                         status.classList.add('text-red-500');
+                     }
+                 } catch (error) {
+                     loader.classList.add('hidden');
+                     status.textContent = `Error: ${error.message}`;
+                     status.classList.add('text-red-500');
+                 }
+             }
+
+             // Download media
+             async function downloadMedia(url, format, quality, trim, startTime, endTime) {
+                 const status = document.getElementById('status');
+                 const loader = document.getElementById('loader');
+                 const progress = document.getElementById('progress');
+                 const progressBar = document.getElementById('progressBar');
+                 const cookiesFile = document.getElementById('cookiesFile').files[0];
+
+                 status.textContent = 'Processing...';
+                 status.classList.remove('text-red-500', 'text-green-500');
+                 loader.classList.remove('hidden');
+                 progress.classList.remove('hidden');
+                 progressBar.style.width = '0%';
+
+                 try {
+                     // Simulate progress
+                     let progressValue = 0;
+                     const progressInterval = setInterval(() => {
+                         progressValue += 10;
+                         progressBar.style.width = `${progressValue}%`;
+                         if (progressValue >= 100) clearInterval(progressInterval);
+                     }, 500);
+
+                     const formData = new FormData();
+                     formData.append('url', url);
+                     formData.append('format', format);
+                     formData.append('quality', quality);
+                     formData.append('trim', trim);
+                     formData.append('startTime', startTime);
+                     formData.append('endTime', endTime);
+                     if (cookiesFile) {
+                         formData.append('cookies', cookiesFile);
+                     }
+
+                     const response = await fetch('https://your-app.onrender.com/download', {
+                         method: 'POST',
+                         body: formData
+                     });
+
+                     clearInterval(progressInterval);
+                     progressBar.style.width = '100%';
+                     loader.classList.add('hidden');
+                     progress.classList.add('hidden');
+
+                     if (response.ok) {
+                         const blob = await response.blob();
+                         const contentDisposition = response.headers.get('Content-Disposition');
+                         const fileName = contentDisposition?.match(/filename="(.+)"/)?.[1] || `media.${format}`;
+                         const downloadUrl = window.URL.createObjectURL(blob);
+                         const a = document.createElement('a');
+                         a.href = downloadUrl;
+                         a.download = fileName;
+                         document.body.appendChild(a);
+                         a.click();
+                         window.URL.revokeObjectURL(downloadUrl);
+                         a.remove();
+                         status.textContent = 'Download started!';
+                         status.classList.add('text-green-500');
+                     } else {
+                         const errorText = await response.text();
+                         status.textContent = `Error: ${errorText}`;
+                         status.classList.add('text-red-500');
+                     }
+                 } catch (error) {
+                     loader.classList.add('hidden');
+                     progress.classList.add('hidden');
+                     status.textContent = `Error: ${error.message}`;
+                     status.classList.add('text-red-500');
+                 }
+             }
+         </script>
+     </body>
+     </html>
+     
